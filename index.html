@@ -534,16 +534,16 @@
             registrosArr.forEach(reg => {
                 const tr = document.createElement('tr');
                 
-                // Limpa o número para o link do WhatsApp (deixa apenas dígitos)
-                const numeroZap = reg.telefone.replace(/\D/g, '');
+                // Limpa o número para o link do WhatsApp (força conversão para String para evitar erro se a planilha salvar como Número)
+                const numeroZap = String(reg.telefone || '').replace(/\D/g, '');
                 // Formata o endereço para a busca do Google Maps
-                const queryMapa = encodeURIComponent(reg.endereco + ', Barra do Bugres, MT');
+                const queryMapa = encodeURIComponent(String(reg.endereco || '') + ', Barra do Bugres, MT');
 
                 tr.innerHTML = `
-                    <td>${reg.nome}</td>
-                    <td>${reg.telefone}</td>
-                    <td>${reg.endereco}</td>
-                    <td>${reg.situacao_agua}</td>
+                    <td>${reg.nome || ''}</td>
+                    <td>${reg.telefone || ''}</td>
+                    <td>${reg.endereco || ''}</td>
+                    <td>${reg.situacao_agua || ''}</td>
                     <td>
                         <a href="https://wa.me/55${numeroZap}" target="_blank" class="action-btn btn-zap">WhatsApp</a>
                         <a href="https://maps.google.com/?q=${queryMapa}" target="_blank" class="action-btn btn-map">Mapa</a>
@@ -581,12 +581,15 @@
                         const tbody = document.getElementById('registros-tbody');
                         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--primary-blue);">Carregando dados da nuvem...</td></tr>';
                         
-                        const response = await fetch(SCRIPT_URL);
+                        // Adicionado um parâmetro de data/hora para forçar o navegador a não usar cache antigo
+                        const response = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
                         const dadosPlanilha = await response.json();
                         
                         // Atualiza os dados sincronizados
                         registrosArr.length = 0; 
-                        dadosPlanilha.forEach(item => registrosArr.push(item));
+                        if (Array.isArray(dadosPlanilha)) {
+                            dadosPlanilha.forEach(item => registrosArr.push(item));
+                        }
                         atualizarTabelaAdmin();
                     } catch (e) {
                         console.error("Erro ao puxar dados da planilha:", e);
