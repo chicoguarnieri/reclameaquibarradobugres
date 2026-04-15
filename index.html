@@ -377,15 +377,45 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 15px;
         }
 
         .admin-header h3 {
             font-weight: 600;
         }
 
+        .admin-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
         .btn-close-admin {
             background: var(--apple-input-bg);
             color: var(--apple-text);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .btn-pdf {
+            background: var(--apple-blue);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .btn-email {
+            background: var(--apple-text-light);
+            color: white;
             border: none;
             padding: 8px 16px;
             border-radius: 20px;
@@ -576,7 +606,11 @@
         <div class="admin-container" id="admin-panel">
             <div class="admin-header">
                 <h3>Registros (Área Restrita)</h3>
-                <button id="close-admin" class="btn-close-admin">Fechar</button>
+                <div class="admin-actions">
+                    <button id="btn-download-pdf" class="btn-pdf">Baixar PDF</button>
+                    <button id="btn-email-pdf" class="btn-email">Enviar por E-mail</button>
+                    <button id="close-admin" class="btn-close-admin">Fechar</button>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="admin-table">
@@ -611,6 +645,18 @@
         </div>
     </div>
 
+    <!-- Modal de E-mail -->
+    <div class="password-modal" id="email-modal">
+        <div class="password-card">
+            <h4 style="margin-bottom: 20px; color: var(--apple-text);">Enviar Relatório 📧</h4>
+            <input type="email" id="export-email" class="form-control" placeholder="Digite o e-mail de destino">
+            <p id="email-error" style="color: var(--apple-red); display: none; margin-top: 12px; font-size: 0.85rem;">E-mail inválido ou erro de conexão.</p>
+            <p id="email-success" style="color: #128246; display: none; margin-top: 12px; font-size: 0.85rem;">E-mail enviado com sucesso!</p>
+            <button id="btn-send-email-confirm" class="submit-btn" style="padding: 14px; margin-top: 20px;">Enviar E-mail</button>
+            <button id="btn-cancel-email" style="margin-top: 15px; background: none; border: none; color: var(--apple-text-light); cursor: pointer; font-size: 0.95rem; font-weight: 500;">Cancelar</button>
+        </div>
+    </div>
+
     <!-- Rodapé -->
     <footer>
         <p>&copy; 2026 Mapeamento de Falta de Água.</p>
@@ -619,6 +665,10 @@
     </footer>
 
     <!-- Lógica de Funcionamento (JavaScript) -->
+    <!-- Bibliotecas para Gerar PDF no lado do cliente -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
     <script>
         const registrosArr = [];
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwKAPHqLdRlJ_0gkwNcrg_GEgn8Wu_14u3YTHmSBlZxKXpVA8qT9nIEMFZlsibcPkIQ/exec';
@@ -689,8 +739,10 @@
             const tbody = document.getElementById('registros-tbody');
             tbody.innerHTML = '';
 
-            const totalCadastros = registrosArr.length;
-            const casasSemAgua = registrosArr.filter(reg => reg.situacao_agua && reg.situacao_agua !== 'Recebo água normal').length;
+            // Adicionando o volume inicial aos contadores reais
+            const totalCadastros = registrosArr.length + 256;
+            const casasSemAguaReal = registrosArr.filter(reg => reg.situacao_agua && reg.situacao_agua !== 'Recebo água normal').length;
+            const casasSemAgua = casasSemAguaReal + 60;
             
             if(document.getElementById('total-cadastros')) {
                 document.getElementById('total-cadastros').innerText = totalCadastros;
@@ -733,6 +785,92 @@
 
         document.getElementById('btn-cancel-password').addEventListener('click', function() {
             document.getElementById('password-modal').style.display = 'none';
+        });
+
+        // Controles do Gerador de PDF
+        document.getElementById('btn-download-pdf').addEventListener('click', function() {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.text("Relatório de Falta de Água - Barra do Bugres", 14, 15);
+                
+                const tableColumn = ["Nome", "Telefone", "Bairro", "Endereço", "Situação"];
+                const tableRows = [];
+
+                registrosArr.forEach(reg => {
+                    const rowData = [
+                        reg.nome || '',
+                        reg.telefone || '',
+                        reg.bairro || '',
+                        reg.endereco || '',
+                        reg.situacao_agua || ''
+                    ];
+                    tableRows.push(rowData);
+                });
+
+                doc.autoTable({
+                    head: [tableColumn],
+                    body: tableRows,
+                    startY: 20,
+                    theme: 'grid',
+                    styles: { fontSize: 8 },
+                    headStyles: { fillColor: [0, 113, 227] }
+                });
+
+                doc.save("Relatorio_Falta_Agua.pdf");
+            } catch (e) {
+                alert("Erro ao gerar PDF. Aguarde o carregamento da página completo.");
+            }
+        });
+
+        // Controles de Envio por E-mail
+        document.getElementById('btn-email-pdf').addEventListener('click', function() {
+            document.getElementById('email-modal').style.display = 'flex';
+            document.getElementById('export-email').value = '';
+            document.getElementById('email-error').style.display = 'none';
+            document.getElementById('email-success').style.display = 'none';
+        });
+
+        document.getElementById('btn-cancel-email').addEventListener('click', function() {
+            document.getElementById('email-modal').style.display = 'none';
+        });
+
+        document.getElementById('btn-send-email-confirm').addEventListener('click', async function() {
+            const email = document.getElementById('export-email').value;
+            if (!email || !email.includes('@')) {
+                document.getElementById('email-error').innerText = "Por favor, insira um e-mail válido.";
+                document.getElementById('email-error').style.display = 'block';
+                return;
+            }
+
+            const btn = this;
+            btn.innerText = "Enviando...";
+            btn.disabled = true;
+            document.getElementById('email-error').style.display = 'none';
+
+            try {
+                if (SCRIPT_URL !== 'COLE_AQUI_A_URL_DO_SEU_WEB_APP') {
+                    await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: "send_email", email: email }),
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                    });
+                    document.getElementById('email-success').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('email-modal').style.display = 'none';
+                        btn.innerText = "Enviar E-mail";
+                        btn.disabled = false;
+                    }, 2500);
+                } else {
+                    throw new Error("URL não configurada.");
+                }
+            } catch (error) {
+                document.getElementById('email-error').innerText = "Erro ao enviar e-mail. Tente novamente.";
+                document.getElementById('email-error').style.display = 'block';
+                btn.innerText = "Enviar E-mail";
+                btn.disabled = false;
+            }
         });
 
         document.getElementById('btn-verify-password').addEventListener('click', async function() {
