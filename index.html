@@ -215,9 +215,14 @@
         .profile-quote { background: #f9f9fb; border-left: 4px solid var(--apple-blue); padding: 15px; text-align: left; font-style: italic; color: var(--apple-text-light); margin: 20px 0; border-radius: 0 8px 8px 0; font-size: 0.95rem;}
         .iframe-map { width: 100%; height: 200px; border: none; border-radius: var(--radius-sm); margin-bottom: 20px; background: #eee; position: relative; z-index: 1;}
 
-        /* Marcadores do Mapa CSS */
-        .marker-pin { width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); display: block; }
-        .custom-pin { display: flex; justify-content: center; align-items: center; background: transparent; border: none; }
+        /* CSS para Autocomplete e Marcadores */
+        .autocomplete-items { position: absolute; border: 1px solid var(--apple-border); z-index: 99; top: 100%; left: 0; right: 0; background-color: var(--apple-card); border-radius: var(--radius-sm); box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-height: 200px; overflow-y: auto; }
+        .autocomplete-items div { padding: 12px; cursor: pointer; border-bottom: 1px solid var(--apple-border); font-size: 0.9rem; line-height: 1.2; text-align: left; }
+        .autocomplete-items div:hover { background-color: var(--apple-input-bg); }
+
+        /* CSS dos Marcadores de Localização (Pin Clássico) */
+        .custom-svg-pin { background: transparent; border: none; }
+        .custom-svg-pin svg { filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.4)); }
         
         /* Força o Google Maps a ficar no Modo Escuro quando o tema Dark estiver ativo */
         [data-theme="dark"] .leaflet-layer { filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(85%); }
@@ -279,23 +284,27 @@
                                 <option value="São Raimundo">São Raimundo</option>
                                 <option value="Jardim Boa Esperança">Jardim Boa Esperança</option>
                                 <option value="Jardim Oriente">Jardim Oriente</option>
-                                <option value="Jardim Primavera / Bairro Primavera">Jardim Primavera / Bairro Primavera</option>
+                                <option value="Jardim Primavera">Jardim Primavera</option>
                                 <option value="Jardim República">Jardim República</option>
                                 <option value="Bairro Pronav">Bairro Pronav</option>
-                                <option value="Loteamento Renê Barbur">Loteamento Renê Barbur</option>
-                            </optgroup>
-                            <optgroup label="Distritos e Comunidades Locais">
-                                <option value="Distrito de Assari">Distrito de Assari</option>
-                                <option value="Comunidade Currupira">Comunidade Currupira</option>
-                                <option value="Comunidade Novo Fernandópolis">Comunidade Novo Fernandópolis</option>
+                                <option value="DEFAULT">Outro</option>
                             </optgroup>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label for="endereco">Endereço Completo</label>
-                        <input type="text" id="endereco" name="endereco" class="form-control" placeholder="Rua, Número, Ponto de Referência" required>
+                        <div style="position: relative;">
+                            <input type="text" id="endereco" name="endereco" class="form-control" placeholder="Rua, Número, Ponto de Referência" required autocomplete="off">
+                            <div id="autocomplete-list" class="autocomplete-items"></div>
+                        </div>
                         <button type="button" id="btn-gps" style="margin-top: 8px; background: none; border: none; color: var(--apple-blue); cursor: pointer; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 5px;">📍 Obter minha localização exata</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ajuste sua localização no mapa</label>
+                        <div id="form-map" style="width: 100%; height: 200px; border-radius: var(--radius-md); border: 2px solid var(--apple-border); z-index: 1; position: relative;"></div>
+                        <p style="font-size: 0.8rem; color: var(--apple-text-light); margin-top: 5px;">Arraste o mapa para posicionar o pino azul exatamente sobre a sua casa.</p>
                     </div>
 
                     <div class="form-group">
@@ -396,13 +405,27 @@
         let adminTileLayer = null;
         let modalMapInstance = null;
         let modalTileLayer = null;
+        let formMapInstance = null;
+        let mapInteraction = false;
 
-        // Provedor OpenStreetMap (100% Estável e sem problemas de CORS ou bloqueios de subdomínio)
+        // Provedor OpenStreetMap
         function getMapTileUrl() {
             return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
         }
 
-        // ====== CONTROLE DE TEMA (CLARO/ESCURO) ======
+        // Função Criadora do Marcador Clássico (Pin de Localização)
+        function getPinIcon(cor) {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="36" height="36"><path fill="${cor}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="#ffffff" stroke-width="1.5"/><circle cx="12" cy="9" r="3.5" fill="#fff"/></svg>`;
+            return L.divIcon({
+                className: 'custom-svg-pin',
+                html: svg,
+                iconSize: [36, 36],
+                iconAnchor: [18, 36], // Faz a ponta do marcador apontar para o local exato
+                popupAnchor: [0, -36]
+            });
+        }
+
+        // ====== CONTROLE DE TEMA ======
         const themeToggleBtn = document.getElementById('theme-toggle');
         const currentTheme = localStorage.getItem('theme') || 'light';
         
@@ -455,6 +478,35 @@
 
         window.addEventListener('DOMContentLoaded', async function() {
             await carregarDadosPlanilha();
+            
+            // Inicializa o mapa interativo do formulário
+            formMapInstance = L.map('form-map', { zoomControl: false }).setView([-15.0743, -57.1808], 14);
+            L.tileLayer(getMapTileUrl(), { attribution: '© OpenStreetMap' }).addTo(formMapInstance);
+            
+            // Adiciona o Pino Azul fixo no centro do mapa (Crosshair)
+            const centerMarkerDiv = document.createElement('div');
+            centerMarkerDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="36" height="36" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -100%);"><path fill="#0071e3" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="#ffffff" stroke-width="1.5"/><circle cx="12" cy="9" r="3.5" fill="#fff"/></svg>`;
+            centerMarkerDiv.style.position = 'absolute';
+            centerMarkerDiv.style.top = '0';
+            centerMarkerDiv.style.left = '0';
+            centerMarkerDiv.style.width = '100%';
+            centerMarkerDiv.style.height = '100%';
+            centerMarkerDiv.style.zIndex = '1000';
+            centerMarkerDiv.style.pointerEvents = 'none'; // Permite que o utilizador arraste o mapa por baixo do pino
+            document.getElementById('form-map').appendChild(centerMarkerDiv);
+
+            // Regista se o utilizador moveu o mapa manualmente
+            formMapInstance.on('dragend zoomend', function() {
+                mapInteraction = true;
+            });
+        });
+
+        // Quando o utilizador escolhe o Bairro, o mini-mapa voa para lá (se ele não tiver tocado no mapa antes)
+        document.getElementById('bairro').addEventListener('change', function(e) {
+            if(!mapInteraction && !exactLat) {
+                let coords = coordsBairros[e.target.value] || coordsBairros["DEFAULT"];
+                if(formMapInstance) formMapInstance.setView(coords, 15);
+            }
         });
 
         function atualizarEstatisticasIniciais() {
@@ -470,6 +522,62 @@
 
         let exactLat = null;
         let exactLng = null;
+        let debounceTimer;
+
+        // Busca Inteligente (Autocomplete) e Atualização do Mapa
+        document.getElementById('endereco').addEventListener('input', function(e) {
+            clearTimeout(debounceTimer);
+            let val = this.value;
+            let list = document.getElementById('autocomplete-list');
+            list.innerHTML = '';
+            
+            if (!val || val.length < 4) return;
+            
+            let bairro = document.getElementById('bairro').value || '';
+            let contextQuery = val + (bairro ? `, ${bairro}` : '') + ', Barra do Bugres, MT, Brasil';
+
+            // O Timer de 1000ms evita o Erro 403 (bloqueio por excesso de tentativas no servidor de mapas)
+            debounceTimer = setTimeout(async () => {
+                try {
+                    let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(contextQuery)}&limit=5&addressdetails=1`;
+                    let res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
+                    if (!res.ok) throw new Error('403 ou falha na rede');
+                    let data = await res.json();
+                    
+                    data.forEach(item => {
+                        let div = document.createElement('div');
+                        let displayName = item.display_name;
+                        let ruaAbreviada = displayName.split(',')[0];
+                        
+                        div.innerHTML = `<strong>${ruaAbreviada}</strong><br><small style="color:var(--apple-text-light)">${displayName}</small>`;
+                        div.addEventListener('click', function() {
+                            document.getElementById('endereco').value = ruaAbreviada;
+                            list.innerHTML = '';
+                            
+                            let lat = parseFloat(item.lat);
+                            let lon = parseFloat(item.lon);
+                            exactLat = lat;
+                            exactLng = lon;
+                            
+                            // VOA O MAPA EXATAMENTE PARA O ENDEREÇO SELECIONADO
+                            if(formMapInstance) {
+                                formMapInstance.setView([lat, lon], 17);
+                                mapInteraction = true;
+                            }
+                        });
+                        list.appendChild(div);
+                    });
+                } catch (e) { console.warn("Autocomplete bloqueado ou falhou:", e); }
+            }, 1000); 
+        });
+
+        // Fecha a lista de autocomplete se clicar fora
+        document.addEventListener('click', function (e) {
+            if (e.target.id !== "endereco") {
+                let list = document.getElementById('autocomplete-list');
+                if (list) list.innerHTML = '';
+            }
+        });
 
         document.getElementById('btn-gps').addEventListener('click', function() {
             if (navigator.geolocation) {
@@ -477,6 +585,13 @@
                 navigator.geolocation.getCurrentPosition(async (pos) => {
                     exactLat = pos.coords.latitude;
                     exactLng = pos.coords.longitude;
+                    
+                    // Move o mini-mapa exatamente para a coordenada do GPS do aparelho
+                    if (formMapInstance) {
+                        formMapInstance.setView([exactLat, exactLng], 17);
+                        mapInteraction = true;
+                    }
+                    
                     this.innerText = '✅ Localização exata capturada!';
                     this.style.color = 'var(--apple-green)';
                 }, () => {
@@ -493,15 +608,39 @@
             const formData = new FormData(this);
             const data = Object.fromEntries(formData.entries());
             
-            data.lat = exactLat || "";
-            data.lng = exactLng || "";
+            // Pega SEMPRE o centro do mini-mapa (que o utilizador arrastou)
+            if (formMapInstance && (mapInteraction || exactLat)) {
+                let center = formMapInstance.getCenter();
+                data.lat = center.lat;
+                data.lng = center.lng;
+            } else {
+                data.lat = "";
+                data.lng = "";
+            }
             
             if (!data.lat) {
                 try {
-                    let q = encodeURIComponent(`${data.endereco}, ${data.bairro}, Barra do Bugres, MT, Brasil`);
-                    let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`);
-                    let json = await res.json();
-                    if(json.length > 0) { data.lat = json[0].lat; data.lng = json[0].lon; }
+                    let ruaCrua = data.endereco.split(',')[0].trim();
+                    let rua = ruaCrua.replace(/(nº|n°|numero|número)\s*\d+/gi, '').trim();
+                    let queries = [
+                        `${rua}, ${data.bairro}, Barra do Bugres, MT, Brasil`,
+                        `${rua}, Barra do Bugres, MT, Brasil`
+                    ];
+                    
+                    for(let q of queries) {
+                        let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
+                        let json = await res.json();
+                        if(json && json.length > 0) { 
+                            let lLat = parseFloat(json[0].lat);
+                            let lLon = parseFloat(json[0].lon);
+                            // Filtro de segurança: Garante que a pesquisa não cai fora do Mato Grosso
+                            if (lLat < -14.0 && lLat > -16.0 && lLon < -56.0 && lLon > -58.0) {
+                                data.lat = lLat; 
+                                data.lng = lLon; 
+                                break; 
+                            }
+                        }
+                    }
                 } catch (e) {}
             }
 
@@ -509,6 +648,14 @@
                 await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
                 document.getElementById('notification-area').innerHTML = '<div class="notification success" style="display:block">✅ Informações enviadas!</div>';
                 this.reset();
+                
+                // Reseta o mini-mapa para o estado inicial
+                mapInteraction = false;
+                exactLat = null; exactLng = null;
+                if(formMapInstance) formMapInstance.setView([-15.0743, -57.1808], 14);
+                document.getElementById('btn-gps').innerText = '📍 Obter minha localização exata';
+                document.getElementById('btn-gps').style.color = 'var(--apple-blue)';
+
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (error) { alert("Erro ao enviar."); }
             finally { btnSubmit.innerText = 'Enviar Informações'; btnSubmit.disabled = false; }
@@ -519,7 +666,6 @@
             document.getElementById('admin-view').style.display = 'block';
             window.scrollTo(0,0);
             
-            // Força recálculo IMEDIATAMENTE após a div ficar visível
             if (leafletMap) {
                 setTimeout(function(){ leafletMap.invalidateSize(); }, 100);
             }
@@ -566,56 +712,64 @@
             const str = (bairro || '') + (endereco || '');
             let hash = 0;
             for (let i = 0; i < str.length; i++) { hash = str.charCodeAt(i) + ((hash << 5) - hash); }
-            const latOffset = ((hash % 100) - 50) / 30000;
-            const lngOffset = (((hash / 100) % 100) - 50) / 30000;
+            
+            // Dispersão visual alargada para garantir que os pinos não ficam uns em cima dos outros
+            const latOffset = ((Math.abs(hash) % 100) - 50) / 10000;
+            const lngOffset = (((Math.abs(hash) / 100) % 100) - 50) / 10000;
             return [base[0] + latOffset, base[1] + lngOffset];
         }
 
         function getCorSituacao(sit) {
-            if(sit === 'Nunca') return '#ff3b30';
-            if(sit === 'Nem sempre') return '#ff9500';
-            if(sit === 'De vez em quando') return '#ffcc00';
-            return '#34c759';
+            if (!sit) return '#34c759'; // Verde padrão
+            const s = sit.trim().toLowerCase();
+            if(s.includes('nunca')) return '#ff3b30'; // Vermelho (Sem água)
+            if(s.includes('nem sempre')) return '#ff9500'; // Laranja
+            if(s.includes('vez em quando')) return '#ffcc00'; // Amarelo
+            return '#34c759'; // Verde (Água normal)
         }
 
         function getBadgeClass(sit) {
-            if(sit === 'Nunca') return 'badge-nunca';
-            if(sit === 'Nem sempre') return 'badge-nem';
-            if(sit === 'De vez em quando') return 'badge-vez';
+            if (!sit) return 'badge-normal';
+            const s = sit.trim().toLowerCase();
+            if(s.includes('nunca')) return 'badge-nunca';
+            if(s.includes('nem sempre')) return 'badge-nem';
+            if(s.includes('vez em quando')) return 'badge-vez';
             return 'badge-normal';
         }
 
         function renderizarPainelAdmin() {
             if (!leafletMap) {
+                // Inicia o mapa centrado em Barra do Bugres
                 leafletMap = L.map('admin-map').setView([-15.0743, -57.1808], 14);
+            } else {
+                // Força a visão para a cidade sempre que o painel for aberto
+                leafletMap.setView([-15.0743, -57.1808], 14); 
             }
             
             if (adminTileLayer) leafletMap.removeLayer(adminTileLayer);
             
-            // Adicionando a camada base com as diretrizes do provedor e sem subdomínios (sem falhas de CORS)
-            adminTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            adminTileLayer = L.tileLayer(getMapTileUrl(), {
                 maxZoom: 19,
                 attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             }).addTo(leafletMap);
 
-            // CORREÇÃO CRÍTICA PARA O MAPA CINZENTO: Força o Leaflet a recalcular o tamanho
             setTimeout(function() { leafletMap.invalidateSize(); }, 100);
+            setTimeout(function() { leafletMap.invalidateSize(); }, 500);
 
             leafletMap.eachLayer((layer) => { if(layer instanceof L.Marker) { leafletMap.removeLayer(layer); } });
             const container = document.getElementById('cards-container');
             container.innerHTML = '';
 
-            let markerBounds = L.latLngBounds();
             registrosArr.forEach((reg) => {
                 const cor = getCorSituacao(reg.situacao_agua);
                 let latVal = parseCoordBR(reg.lat);
                 let lngVal = parseCoordBR(reg.lng);
                 const coords = (!isNaN(latVal) && !isNaN(lngVal)) ? [latVal, lngVal] : obterCoordenadasFallback(reg.bairro, reg.endereco);
                 
+                // Aplicando o Marcador com a cor correspondente à situação
                 L.marker(coords, {
-                    icon: L.divIcon({ className: 'custom-pin', html: `<div class="marker-pin" style="background-color: ${cor};"></div>`, iconSize: [20, 20], iconAnchor: [10, 10]})
+                    icon: getPinIcon(cor)
                 }).addTo(leafletMap).bindPopup(`<b>${reg.nome}</b><br>${reg.situacao_agua}`);
-                markerBounds.extend(coords);
 
                 const card = document.createElement('div');
                 card.className = 'user-card';
@@ -629,7 +783,9 @@
                 card.addEventListener('click', () => abrirPerfilModal(reg, coords));
                 container.appendChild(card);
             });
-            if (registrosArr.length > 0) leafletMap.fitBounds(markerBounds, {padding: [50, 50]});
+            
+            // REMOVIDO: O comando fitBounds que causava o "zoom exagerado" na tela branca.
+            // O mapa agora permanecerá focado em Barra do Bugres no nível de zoom 14 ideal.
         }
 
         function abrirPerfilModal(reg, coords) {
@@ -656,7 +812,7 @@
                     modalMapInstance = null;
                 }
                 modalMapInstance = L.map('modal-map').setView(coords, 16);
-                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                L.tileLayer(getMapTileUrl(), {
                     maxZoom: 19,
                     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 }).addTo(modalMapInstance);
@@ -665,7 +821,7 @@
                 setTimeout(function(){ modalMapInstance.invalidateSize(); }, 100);
                 
                 L.marker(coords, {
-                    icon: L.divIcon({ className: 'custom-pin', html: `<div class="marker-pin" style="background-color: ${getCorSituacao(reg.situacao_agua)};"></div>`, iconSize: [20, 20], iconAnchor: [10, 10]})
+                    icon: getPinIcon(getCorSituacao(reg.situacao_agua))
                 }).addTo(modalMapInstance);
                 
                 // Rota OSRM
@@ -679,7 +835,7 @@
                             if(osrmData.routes && osrmData.routes.length > 0) {
                                 let routeCoords = osrmData.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
                                 let routeLine = L.polyline(routeCoords, {color: '#0071e3', weight: 4}).addTo(modalMapInstance);
-                                modalMapInstance.fitBounds(routeLine.getBounds(), {padding: [20,20]});
+                                modalMapInstance.fitBounds(routeLine.getBounds(), {padding: [20,20], maxZoom: 16});
                             }
                         } catch(e) { console.error("Erro na rota OSRM", e); }
                     });
