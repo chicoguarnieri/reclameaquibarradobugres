@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mapeamento de Falta de Água</title>
     
-    <!-- Biblioteca de Mapas (Leaflet) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -27,6 +26,17 @@
             --radius-lg: 24px;
             --radius-md: 14px;
             --radius-sm: 10px;
+        }
+
+        /* Variáveis de Tema Escuro */
+        [data-theme="dark"] {
+            --apple-bg: #0d1117; 
+            --apple-card: #161b22;
+            --apple-text: #c9d1d9; 
+            --apple-text-light: #8b949e;
+            --apple-blue: #2f81f7;
+            --apple-input-bg: #010409; 
+            --apple-border: #30363d;
         }
 
         * {
@@ -69,8 +79,30 @@
             text-align: center;
         }
 
+        [data-theme="dark"] header {
+            background: rgba(13, 17, 23, 0.85);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
         header h1 { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.02em; }
         header p { font-size: 0.85rem; color: var(--apple-text-light); margin-top: 2px; }
+
+        /* Botão Tema Claro/Escuro */
+        .theme-toggle-btn {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+            color: var(--apple-text);
+        }
+        .theme-toggle-btn:hover { background-color: var(--apple-input-bg); }
 
         .content-wrapper { max-width: 860px; margin: 0 auto; padding: 30px 20px; flex-grow: 1; width: 100%; }
 
@@ -149,7 +181,7 @@
         .btn-pdf { background: var(--apple-blue); color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
 
         /* Mapa do Admin */
-        #admin-map { width: 100%; height: 40vh; border-bottom: 3px solid var(--apple-border); background: #ddd; }
+        #admin-map { width: 100%; height: 40vh; border-bottom: 3px solid var(--apple-border); background: #ddd; z-index: 1; }
 
         /* Cards em vez de Tabela */
         .cards-container { padding: 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto;}
@@ -181,10 +213,14 @@
         /* Perfil Detalhado no Modal */
         .profile-pic { width: 60px; height: 60px; background: var(--apple-blue); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; font-weight: bold; margin: 0 auto 15px auto; }
         .profile-quote { background: #f9f9fb; border-left: 4px solid var(--apple-blue); padding: 15px; text-align: left; font-style: italic; color: var(--apple-text-light); margin: 20px 0; border-radius: 0 8px 8px 0; font-size: 0.95rem;}
-        .iframe-map { width: 100%; height: 200px; border: none; border-radius: var(--radius-sm); margin-bottom: 20px; background: #eee;}
+        .iframe-map { width: 100%; height: 200px; border: none; border-radius: var(--radius-sm); margin-bottom: 20px; background: #eee; position: relative; z-index: 1;}
 
         /* Marcadores do Mapa CSS */
-        .marker-pin { width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .marker-pin { width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); display: block; }
+        .custom-pin { display: flex; justify-content: center; align-items: center; background: transparent; border: none; }
+        
+        /* Força o Google Maps a ficar no Modo Escuro quando o tema Dark estiver ativo */
+        [data-theme="dark"] .leaflet-layer { filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(85%); }
 
         @media (max-width: 600px) {
             .banner { height: 220px; }
@@ -196,11 +232,11 @@
 </head>
 <body>
 
-    <!-- ==================== TELA PRINCIPAL (SITE PÚBLICO) ==================== -->
     <div id="main-view">
         <header>
             <h1>Mapeamento de Falta de Água</h1>
             <p>Ancora Sistemas inteligêntes v0.1</p>
+            <button id="theme-toggle" aria-label="Alternar tema" class="theme-toggle-btn">🌙</button>
         </header>
 
         <main class="content-wrapper">
@@ -278,6 +314,7 @@
                     <div class="form-group">
                         <label for="endereco">Endereço Completo</label>
                         <input type="text" id="endereco" name="endereco" class="form-control" placeholder="Rua, Número, Ponto de Referência" required>
+                        <button type="button" id="btn-gps" style="margin-top: 8px; background: none; border: none; color: var(--apple-blue); cursor: pointer; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 5px;">📍 Obter minha localização exata</button>
                     </div>
 
                     <div class="form-group">
@@ -318,13 +355,12 @@
         </main>
 
         <footer>
-            <p>&copy; Mapeamento de Falta de Água</p>
+            <p>© 2026 Mapeamento de Falta de Água</p>
             <p style="margin-top: 20px;"><a href="#" id="open-admin">🔒 Área Administrativa</a></p>
         </footer>
     </div>
 
 
-    <!-- ==================== TELA ADMINISTRATIVA (SPA) ==================== -->
     <div id="admin-view">
         <div class="admin-header-bar">
             <h3>Visão Geral - Área Restrita</h3>
@@ -335,17 +371,13 @@
             </div>
         </div>
         
-        <!-- Mapa Principal -->
         <div id="admin-map"></div>
 
-        <!-- Grid de Cards (Canvases) -->
         <div class="cards-container" id="cards-container">
             <p style="text-align: center; width: 100%; color: var(--apple-text-light);">Carregando registros...</p>
         </div>
     </div>
 
-    <!-- Modais do Sistema -->
-    <!-- Modal Senha -->
     <div class="custom-modal" id="password-modal">
         <div class="modal-card">
             <h4 style="margin-bottom: 20px;">Acesso Restrito 🔒</h4>
@@ -356,7 +388,6 @@
         </div>
     </div>
 
-    <!-- Modal E-mail -->
     <div class="custom-modal" id="email-modal">
         <div class="modal-card">
             <h4 style="margin-bottom: 20px;">Enviar Relatório 📧</h4>
@@ -368,46 +399,81 @@
         </div>
     </div>
 
-    <!-- Modal Perfil do Usuário (Detalhes) -->
     <div class="custom-modal" id="profile-modal">
         <div class="modal-card" id="profile-content">
-            <!-- Injetado via JS -->
-        </div>
+            </div>
     </div>
 
-    <!-- Bibliotecas para Gerar PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
     <script>
         const registrosArr = [];
-        // ⚠️ IMPORTANTE: Cole aqui a URL do seu Google Apps Script!
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjpIoFnmwoVzXOIk3X_8nfo41r6aGv5u5KdFEHzLLVd_JjlwBp5Vn7xufKilC2rVJh/exec';
         
-        let leafletMap = null; // Variável global do mapa
+        let leafletMap = null; 
+        let adminTileLayer = null;
+        let modalMapInstance = null;
+        let modalTileLayer = null;
+
+        // Função auxiliar para determinar qual mapa mostrar (Google Maps Tiles via Leaflet)
+        function getMapTileUrl() {
+            return 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+        }
+
+        // ====== CONTROLE DE TEMA (CLARO/ESCURO) ======
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        
+        if (currentTheme === 'dark') {
+            document.body.setAttribute('data-theme', 'dark');
+            themeToggleBtn.innerText = '☀️';
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            let theme = document.body.getAttribute('data-theme');
+            if (theme === 'dark') {
+                document.body.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+                themeToggleBtn.innerText = '🌙';
+            } else {
+                document.body.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                themeToggleBtn.innerText = '☀️';
+            }
+        });
+
+        // Dicionário de Coordenadas Exatas dos Bairros de Barra do Bugres para Fallback
+        const coordsBairros = {
+            "Centro": [-15.0715, -57.1800],
+            "Maracanã": [-15.0600, -57.1750],
+            "São Raimundo": [-15.0660, -57.1890],
+            "Jardim Boa Esperança": [-15.0590, -57.1840],
+            "Jardim Oriente": [-15.0620, -57.1750],
+            "Jardim Primavera / Bairro Primavera": [-15.0550, -57.1800],
+            "Jardim República": [-15.0680, -57.1700],
+            "Bairro Pronav": [-15.0750, -57.1750],
+            "Loteamento Renê Barbur": [-15.0800, -57.1800],
+            "Distrito de Assari": [-14.8333, -57.2000],
+            "Comunidade Currupira": [-15.1000, -57.1000],
+            "Comunidade Novo Fernandópolis": [-14.9000, -57.3000],
+            "DEFAULT": [-15.0700, -57.1810]
+        };
 
         window.addEventListener('DOMContentLoaded', async function() {
-            if (SCRIPT_URL && SCRIPT_URL !== 'COLE_AQUI_A_URL_DO_SEU_WEB_APP') {
+            if (SCRIPT_URL) {
                 try {
                     const response = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
                     const textResponse = await response.text();
                     let dadosPlanilha;
-                    try { 
-                        dadosPlanilha = JSON.parse(textResponse); 
-                    } catch (e) { 
-                        throw new Error("Resposta não é JSON. Verifique as configurações de CORS/Deploy do Apps Script."); 
-                    }
+                    try { dadosPlanilha = JSON.parse(textResponse); } catch (e) { throw new Error("Resposta não é JSON."); }
                     
                     if (Array.isArray(dadosPlanilha)) {
                         registrosArr.length = 0;
                         dadosPlanilha.forEach(item => registrosArr.push(item));
                     }
-                } catch (e) {
-                    // Impede que erro de fetch quebre o carregamento inicial da página
-                    console.warn("Aviso (Fetch GET):", e.message, "- Usando fallback local.");
-                }
+                } catch (e) { console.warn("Fetch fallback local."); }
             }
-            // Sempre atualiza a interface, com ou sem dados da nuvem
             atualizarEstatisticasIniciais();
         });
 
@@ -422,7 +488,26 @@
             }
         }
 
-        // Formulário Submit
+        let exactLat = null;
+        let exactLng = null;
+
+        document.getElementById('btn-gps').addEventListener('click', function() {
+            if (navigator.geolocation) {
+                this.innerText = '⏳ Buscando localização pelo satélite...';
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    exactLat = pos.coords.latitude;
+                    exactLng = pos.coords.longitude;
+                    this.innerText = '✅ Localização exata capturada!';
+                    this.style.color = 'var(--apple-green)';
+                }, (err) => {
+                    this.innerText = '❌ Permissão de GPS negada.';
+                    this.style.color = 'var(--apple-red)';
+                });
+            } else {
+                this.innerText = '❌ GPS não suportado.';
+            }
+        });
+
         document.getElementById('leadForm').addEventListener('submit', async function(event) {
             event.preventDefault();
             const btnSubmit = this.querySelector('.submit-btn');
@@ -433,38 +518,45 @@
             const formData = new FormData(this);
             const data = Object.fromEntries(formData.entries());
             
-            try {
-                if (SCRIPT_URL && SCRIPT_URL !== 'COLE_AQUI_A_URL_DO_SEU_WEB_APP') {
-                    try {
-                        await fetch(SCRIPT_URL, {
-                            method: 'POST',
-                            body: JSON.stringify(data),
-                            headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-                        });
-                    } catch (fetchError) {
-                        // Trata erros de CORS/conexão de forma silenciosa e salva na sessão
-                        console.warn("Aviso (Fetch POST): Falha ao salvar na nuvem. Mantendo dados na sessão local.", fetchError);
-                    }
-                }
+            let lat = exactLat || "";
+            let lng = exactLng || "";
+            
+            if (!lat || !lng) {
+                let ruaCrua = data.endereco.split(',')[0].trim();
+                let rua = ruaCrua.replace(/(nº|n°|numero|número)\s*\d+/gi, '').trim();
+                let query = `${rua}, ${data.bairro}, Barra do Bugres, Mato Grosso, Brasil`;
                 
+                try {
+                    let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+                    let geoRes = await fetch(url);
+                    let geoData = await geoRes.json();
+                    if (geoData && geoData.length > 0) {
+                        lat = geoData[0].lat;
+                        lng = geoData[0].lon;
+                    }
+                } catch (e) { console.warn("Geocoding falhou."); }
+            }
+
+            data.lat = lat;
+            data.lng = lng;
+
+            try {
+                if (SCRIPT_URL) {
+                    await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify(data),
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                    });
+                }
                 registrosArr.push(data);
                 atualizarEstatisticasIniciais();
-
-                const notification = document.getElementById('notification-area');
-                notification.innerHTML = '<div class="notification success">✅ Informações enviadas com sucesso!</div>';
-                
+                document.getElementById('notification-area').innerHTML = '<div class="notification success">✅ Informações enviadas!</div>';
                 this.reset();
-                window.scrollTo({ top: document.querySelector('.form-card').offsetTop - 80, behavior: 'smooth' });
-            } catch (error) {
-                alert("Erro inesperado ao processar os dados.");
-                console.error(error);
-            } finally {
-                btnSubmit.innerText = textoOriginal;
-                btnSubmit.disabled = false;
-            }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (error) { alert("Erro ao enviar."); }
+            finally { btnSubmit.innerText = textoOriginal; btnSubmit.disabled = false; }
         });
 
-        // ======= LÓGICA DA ÁREA ADMINISTRATIVA SPA =======
         function abrirAdmin() {
             document.getElementById('main-view').style.display = 'none';
             document.getElementById('admin-view').style.display = 'block';
@@ -475,17 +567,12 @@
         function fecharAdmin() {
             document.getElementById('admin-view').style.display = 'none';
             document.getElementById('main-view').style.display = 'block';
-            window.scrollTo(0,0);
         }
 
-        document.getElementById('open-admin').addEventListener('click', function(e) {
+        document.getElementById('open-admin').addEventListener('click', (e) => {
             e.preventDefault();
             document.getElementById('password-modal').style.display = 'flex';
-            document.getElementById('admin-password').value = '';
-            document.getElementById('password-error').style.display = 'none';
         });
-        document.getElementById('btn-cancel-password').addEventListener('click', () => { document.getElementById('password-modal').style.display = 'none'; });
-        document.getElementById('close-admin').addEventListener('click', fecharAdmin);
 
         document.getElementById('btn-verify-password').addEventListener('click', function() {
             if (document.getElementById('admin-password').value === 'Chico2026') {
@@ -496,28 +583,27 @@
             }
         });
 
-        // Função para gerar coordenadas simuladas realistas no mapa de Barra do Bugres
-        // Usamos um Hash da string (endereço) para que o ponto da pessoa seja sempre o mesmo
-        function obterCoordenadas(bairro, endereco) {
-            const centroLat = -15.0743;
-            const centroLng = -57.1808;
-            if(!bairro && !endereco) return [centroLat, centroLng];
-            
+        document.getElementById('btn-cancel-password').addEventListener('click', () => {
+            document.getElementById('password-modal').style.display = 'none';
+        });
+
+        document.getElementById('close-admin').addEventListener('click', fecharAdmin);
+
+        function obterCoordenadasFallback(bairro, endereco) {
+            let base = coordsBairros[bairro] || coordsBairros["DEFAULT"];
             const str = (bairro || '') + (endereco || '');
             let hash = 0;
             for (let i = 0; i < str.length; i++) { hash = str.charCodeAt(i) + ((hash << 5) - hash); }
-            
-            // Espalha os pontos num raio de aprox 3km
-            const latOffset = (hash % 100) / 4000;
-            const lngOffset = ((hash / 100) % 100) / 4000;
-            return [centroLat + latOffset, centroLng + lngOffset];
+            const latOffset = ((hash % 100) - 50) / 30000;
+            const lngOffset = (((hash / 100) % 100) - 50) / 30000;
+            return [base[0] + latOffset, base[1] + lngOffset];
         }
 
         function getCorSituacao(sit) {
-            if(sit === 'Nunca') return 'var(--apple-red)';
-            if(sit === 'Nem sempre') return 'var(--apple-orange)';
-            if(sit === 'De vez em quando') return 'var(--apple-yellow)';
-            return 'var(--apple-green)'; // Normal
+            if(sit === 'Nunca') return '#ff3b30';
+            if(sit === 'Nem sempre') return '#ff9500';
+            if(sit === 'De vez em quando') return '#ffcc00';
+            return '#34c759';
         }
 
         function getBadgeClass(sit) {
@@ -528,22 +614,13 @@
         }
 
         function renderizarPainelAdmin() {
-            // Inicializa o Mapa Leaflet
             if (!leafletMap) {
                 leafletMap = L.map('admin-map').setView([-15.0743, -57.1808], 14);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap contributors'
-                }).addTo(leafletMap);
+                adminTileLayer = L.tileLayer(getMapTileUrl(), { attribution: '© Google Maps' }).addTo(leafletMap);
             }
-            
-            // Força o mapa a recalcular o tamanho pois estava invisível (display: none)
             setTimeout(() => { leafletMap.invalidateSize(); }, 300);
 
-            // Limpa marcadores existentes (caso chame a função novamente)
-            leafletMap.eachLayer((layer) => {
-                if(layer instanceof L.Marker) { leafletMap.removeLayer(layer); }
-            });
-
+            leafletMap.eachLayer((layer) => { if(layer instanceof L.Marker || layer instanceof L.Polyline) { leafletMap.removeLayer(layer); } });
             const container = document.getElementById('cards-container');
             container.innerHTML = '';
 
@@ -552,123 +629,99 @@
                 return;
             }
 
-            // Renderiza Cards e Marcadores
-            registrosArr.forEach((reg, index) => {
+            let markerBounds = L.latLngBounds();
+            registrosArr.forEach((reg) => {
                 const cor = getCorSituacao(reg.situacao_agua);
-                const coords = obterCoordenadas(reg.bairro, reg.endereco);
+                const coords = (reg.lat && reg.lng) ? [parseFloat(reg.lat), parseFloat(reg.lng)] : obterCoordenadasFallback(reg.bairro, reg.endereco);
                 
-                // Adiciona Marcador no Mapa
-                const customIcon = L.divIcon({
-                    className: 'custom-pin',
-                    html: `<div class="marker-pin" style="background-color: ${cor};"></div>`,
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10]
-                });
-                L.marker(coords, {icon: customIcon}).addTo(leafletMap)
-                 .bindPopup(`<b>${reg.nome}</b><br>${reg.situacao_agua}`);
+                L.marker(coords, {
+                    icon: L.divIcon({ className: 'custom-pin', html: `<div class="marker-pin" style="background-color: ${cor};"></div>`, iconSize: [20, 20], iconAnchor: [10, 10]})
+                }).addTo(leafletMap).bindPopup(`<b>${reg.nome}</b><br>${reg.situacao_agua}`);
+                markerBounds.extend(coords);
 
-                // Renderiza Card
                 const card = document.createElement('div');
                 card.className = 'user-card';
-                
-                const badgeSit = getBadgeClass(reg.situacao_agua);
-                const temOp = reg.opiniao && reg.opiniao.trim().length > 0;
-                
-                let tagsHtml = `<span class="badge ${badgeSit}">${reg.situacao_agua || 'N/A'}</span>`;
-                if(temOp) tagsHtml += `<span class="badge badge-op">💬 Comentou</span>`;
-
                 card.innerHTML = `
                     <div>
-                        <div class="uc-header">
-                            <div class="uc-name">${reg.nome || 'Anônimo'}</div>
-                        </div>
+                        <div class="uc-header"><div class="uc-name">${reg.nome || 'Anônimo'}</div></div>
                         <div class="uc-address">${reg.bairro || ''} <br> ${reg.endereco || ''}</div>
-                        <div class="tags-area">${tagsHtml}</div>
+                        <div class="tags-area"><span class="badge ${getBadgeClass(reg.situacao_agua)}">${reg.situacao_agua}</span></div>
                     </div>
                 `;
-
-                // Clique no card abre perfil
                 card.addEventListener('click', () => abrirPerfilModal(reg, coords));
                 container.appendChild(card);
             });
+            if (registrosArr.length > 0) leafletMap.fitBounds(markerBounds, {padding: [30, 30]});
         }
 
         function abrirPerfilModal(reg, coords) {
             const modal = document.getElementById('profile-modal');
             const content = document.getElementById('profile-content');
-            
             const numeroZap = String(reg.telefone || '').replace(/\D/g, '');
             const queryMapa = encodeURIComponent(`${String(reg.endereco || '')}, ${String(reg.bairro || '')}, Barra do Bugres, MT`);
-            const inicial = (reg.nome) ? reg.nome.charAt(0).toUpperCase() : '?';
             
-            let opiniaoHtml = '';
-            if(reg.opiniao && reg.opiniao.trim().length > 0) {
-                opiniaoHtml = `<div class="profile-quote">"${reg.opiniao}"</div>`;
-            } else {
-                opiniaoHtml = `<p style="font-size:0.85rem; color:#aaa; margin: 15px 0;">Nenhum comentário adicional.</p>`;
-            }
-
             content.innerHTML = `
-                <div class="profile-pic">${inicial}</div>
-                <h3 style="margin-bottom: 5px;">${reg.nome || 'Anônimo'}</h3>
-                <p style="font-size:0.9rem; color:var(--apple-text-light); margin-bottom:15px;">${reg.telefone || ''}</p>
-                
-                <!-- Iframe do Mapa Específico -->
-                <iframe class="iframe-map" src="https://maps.google.com/maps?q=${coords[0]},${coords[1]}&z=16&output=embed"></iframe>
-                
-                <p style="font-weight:600; font-size:0.9rem;">${reg.bairro || ''}</p>
-                <p style="font-size:0.85rem; color:var(--apple-text-light);">${reg.endereco || ''}</p>
-                
-                <div style="margin-top:15px;"><span class="badge ${getBadgeClass(reg.situacao_agua)}">${reg.situacao_agua}</span></div>
-                
-                ${opiniaoHtml}
-                
-                <div class="uc-actions" style="margin-top:20px;">
-                    <a href="https://wa.me/55${numeroZap}" target="_blank" class="action-btn btn-zap">Chamar WhatsApp</a>
+                <div class="profile-pic">${(reg.nome || '?').charAt(0)}</div>
+                <h3>${reg.nome || 'Anônimo'}</h3>
+                <p>${reg.telefone || ''}</p>
+                <div id="modal-map" class="iframe-map"></div>
+                <p><b>${reg.bairro || ''}</b></p>
+                <p>${reg.endereco || ''}</p>
+                <div style="margin-top:10px;"><span class="badge ${getBadgeClass(reg.situacao_agua)}">${reg.situacao_agua}</span></div>
+                <div class="uc-actions" style="margin-top:15px;">
+                    <a href="https://wa.me/55${numeroZap}" target="_blank" class="action-btn btn-zap">WhatsApp</a>
                     <a href="https://maps.google.com/?q=${queryMapa}" target="_blank" class="action-btn btn-map">Abrir no GPS</a>
                 </div>
-                
-                <button onclick="document.getElementById('profile-modal').style.display='none'" class="btn-outline" style="width:100%; margin-top:15px;">Fechar Perfil</button>
+                <button onclick="document.getElementById('profile-modal').style.display='none'" class="btn-outline" style="width:100%; margin-top:10px;">Fechar</button>
             `;
             modal.style.display = 'flex';
+
+            setTimeout(() => {
+                if (modalMapInstance) modalMapInstance.remove();
+                modalMapInstance = L.map('modal-map').setView(coords, 16);
+                L.tileLayer(getMapTileUrl(), { attribution: '© Google Maps' }).addTo(modalMapInstance);
+                L.marker(coords, {
+                    icon: L.divIcon({ className: 'custom-pin', html: `<div class="marker-pin" style="background-color: ${getCorSituacao(reg.situacao_agua)};"></div>`, iconSize: [20, 20], iconAnchor: [10, 10]})
+                }).addTo(modalMapInstance);
+
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(async (pos) => {
+                        const adminLat = pos.coords.latitude;
+                        const adminLng = pos.coords.longitude;
+                        try {
+                            let osrmRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${adminLng},${adminLat};${coords[1]},${coords[0]}?overview=full&geometries=geojson`);
+                            let osrmData = await osrmRes.json();
+                            if(osrmData.routes && osrmData.routes.length > 0) {
+                                let routeCoords = osrmData.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                                let routeLine = L.polyline(routeCoords, {color: '#0071e3', weight: 4}).addTo(modalMapInstance);
+                                modalMapInstance.fitBounds(routeLine.getBounds(), {padding: [20,20]});
+                            }
+                        } catch(e) {}
+                    });
+                }
+            }, 300);
         }
 
-        // --- Resto da Lógica de PDF e Email ---
         document.getElementById('btn-download-pdf').addEventListener('click', function() {
-            try {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                doc.text("Relatório - Barra do Bugres", 14, 15);
-                const tableColumn = ["Nome", "Telefone", "Bairro", "Situação"];
-                const tableRows = registrosArr.map(r => [r.nome||'', r.telefone||'', r.bairro||'', r.situacao_agua||'']);
-                doc.autoTable({ head: [tableColumn], body: tableRows, startY: 20, styles: { fontSize: 8 }, headStyles: { fillColor: [0, 113, 227] }});
-                doc.save("Relatorio_Falta_Agua.pdf");
-            } catch (e) { alert("Erro ao gerar PDF."); }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text("Relatório - Barra do Bugres", 14, 15);
+            const tableRows = registrosArr.map(r => [r.nome||'', r.telefone||'', r.bairro||'', r.situacao_agua||'']);
+            doc.autoTable({ head: [["Nome", "Telefone", "Bairro", "Situação"]], body: tableRows, startY: 20 });
+            doc.save("Relatorio.pdf");
         });
 
-        document.getElementById('btn-email-pdf').addEventListener('click', () => { document.getElementById('email-modal').style.display = 'flex'; });
-        document.getElementById('btn-cancel-email').addEventListener('click', () => { document.getElementById('email-modal').style.display = 'none'; });
-
+        document.getElementById('btn-email-pdf').addEventListener('click', () => document.getElementById('email-modal').style.display = 'flex');
+        document.getElementById('btn-cancel-email').addEventListener('click', () => document.getElementById('email-modal').style.display = 'none');
         document.getElementById('btn-send-email-confirm').addEventListener('click', async function() {
             const email = document.getElementById('export-email').value;
-            if (!email || !email.includes('@')) { 
-                document.getElementById('email-error').innerText = "Insira um e-mail válido.";
-                document.getElementById('email-error').style.display = 'block'; 
-                return; 
-            }
-            const btn = this; btn.innerText = "Enviando..."; btn.disabled = true;
+            if (!email.includes('@')) return;
+            this.innerText = "Enviando...";
             try {
-                await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "send_email", email: email }), headers: { 'Content-Type': 'text/plain;charset=utf-8' }});
-                document.getElementById('email-error').style.display = 'none';
-                document.getElementById('email-success').style.display = 'block';
-                setTimeout(() => { document.getElementById('email-modal').style.display = 'none'; btn.innerText = "Enviar E-mail"; btn.disabled = false; }, 2000);
-            } catch (error) { 
-                console.warn("Erro no envio do e-mail:", error);
-                document.getElementById('email-error').innerText = "Erro ao enviar e-mail. Verifique o Apps Script.";
-                document.getElementById('email-error').style.display = 'block'; 
-                btn.innerText = "Enviar E-mail"; 
-                btn.disabled = false; 
-            }
+                await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "send_email", email: email })});
+                document.getElementById('email-modal').style.display = 'none';
+            } catch (e) { alert("Erro e-mail."); }
+            finally { this.innerText = "Enviar E-mail"; }
         });
     </script>
 </body>
