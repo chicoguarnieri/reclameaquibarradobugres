@@ -181,7 +181,7 @@
         .btn-pdf { background: var(--apple-blue); color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
 
         /* Mapa do Admin */
-        #admin-map { width: 100%; height: 40vh; border-bottom: 3px solid var(--apple-border); background: #ddd; z-index: 1; }
+        #admin-map { width: 100%; height: 40vh; border-bottom: 3px solid var(--apple-border); background: #eee; z-index: 1; }
 
         /* Cards em vez de Tabela */
         .cards-container { padding: 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto;}
@@ -235,7 +235,7 @@
     <div id="main-view">
         <header>
             <h1>Mapeamento de Falta de Água</h1>
-            <p>Ancora Sistemas inteligêntes v0.1</p>
+            <p>Ancora Sistemas inteligentes v0.1</p>
             <button id="theme-toggle" aria-label="Alternar tema" class="theme-toggle-btn">🌙</button>
         </header>
 
@@ -288,25 +288,6 @@
                                 <option value="Distrito de Assari">Distrito de Assari</option>
                                 <option value="Comunidade Currupira">Comunidade Currupira</option>
                                 <option value="Comunidade Novo Fernandópolis">Comunidade Novo Fernandópolis</option>
-                            </optgroup>
-                            <optgroup label="Comunidades Quilombolas">
-                                <option value="Água Doce">Água Doce</option>
-                                <option value="São José do Baixio (Baixiu)">São José do Baixio (Baixiu)</option>
-                                <option value="Morro Redondo">Morro Redondo</option>
-                                <option value="Vaca Morta">Vaca Morta</option>
-                                <option value="Vãozinho (Voltinha)">Vãozinho (Voltinha)</option>
-                                <option value="Vermelhinho">Vermelhinho</option>
-                            </optgroup>
-                            <optgroup label="Terras Indígenas">
-                                <option value="Terra Indígena Umutina">Terra Indígena Umutina</option>
-                                <option value="Terra Indígena Figueiras">Terra Indígena Figueiras</option>
-                            </optgroup>
-                            <optgroup label="Assentamentos Rurais (PA)">
-                                <option value="PA Antônio Conselheiro">PA Antônio Conselheiro</option>
-                                <option value="PA Cabaças">PA Cabaças</option>
-                                <option value="PA Triângulo">PA Triângulo</option>
-                                <option value="PA Vão Grande">PA Vão Grande</option>
-                                <option value="PDS Nova Conquista">PDS Nova Conquista</option>
                             </optgroup>
                         </select>
                     </div>
@@ -416,9 +397,9 @@
         let modalMapInstance = null;
         let modalTileLayer = null;
 
-        // Função auxiliar para determinar qual mapa mostrar (Google Maps Tiles via Leaflet)
+        // Provedor OpenStreetMap (100% Estável e sem problemas de CORS ou bloqueios de subdomínio)
         function getMapTileUrl() {
-            return 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+            return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
         }
 
         // ====== CONTROLE DE TEMA (CLARO/ESCURO) ======
@@ -441,40 +422,39 @@
                 localStorage.setItem('theme', 'dark');
                 themeToggleBtn.innerText = '☀️';
             }
+            if(leafletMap) leafletMap.invalidateSize();
         });
 
-        // Dicionário de Coordenadas Exatas dos Bairros de Barra do Bugres para Fallback
         const coordsBairros = {
             "Centro": [-15.0715, -57.1800],
             "Maracanã": [-15.0600, -57.1750],
             "São Raimundo": [-15.0660, -57.1890],
             "Jardim Boa Esperança": [-15.0590, -57.1840],
             "Jardim Oriente": [-15.0620, -57.1750],
-            "Jardim Primavera / Bairro Primavera": [-15.0550, -57.1800],
+            "Jardim Primavera": [-15.0550, -57.1800],
             "Jardim República": [-15.0680, -57.1700],
             "Bairro Pronav": [-15.0750, -57.1750],
-            "Loteamento Renê Barbur": [-15.0800, -57.1800],
-            "Distrito de Assari": [-14.8333, -57.2000],
-            "Comunidade Currupira": [-15.1000, -57.1000],
-            "Comunidade Novo Fernandópolis": [-14.9000, -57.3000],
             "DEFAULT": [-15.0700, -57.1810]
         };
 
-        window.addEventListener('DOMContentLoaded', async function() {
+        async function carregarDadosPlanilha() {
             if (SCRIPT_URL) {
                 try {
                     const response = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
                     const textResponse = await response.text();
-                    let dadosPlanilha;
-                    try { dadosPlanilha = JSON.parse(textResponse); } catch (e) { throw new Error("Resposta não é JSON."); }
+                    let dadosPlanilha = JSON.parse(textResponse);
                     
                     if (Array.isArray(dadosPlanilha)) {
                         registrosArr.length = 0;
                         dadosPlanilha.forEach(item => registrosArr.push(item));
                     }
-                } catch (e) { console.warn("Fetch fallback local."); }
+                } catch (e) { console.warn("Fetch falhou."); }
             }
             atualizarEstatisticasIniciais();
+        }
+
+        window.addEventListener('DOMContentLoaded', async function() {
+            await carregarDadosPlanilha();
         });
 
         function atualizarEstatisticasIniciais() {
@@ -493,74 +473,58 @@
 
         document.getElementById('btn-gps').addEventListener('click', function() {
             if (navigator.geolocation) {
-                this.innerText = '⏳ Buscando localização pelo satélite...';
+                this.innerText = '⏳ Capturando satélite...';
                 navigator.geolocation.getCurrentPosition(async (pos) => {
                     exactLat = pos.coords.latitude;
                     exactLng = pos.coords.longitude;
                     this.innerText = '✅ Localização exata capturada!';
                     this.style.color = 'var(--apple-green)';
-                }, (err) => {
-                    this.innerText = '❌ Permissão de GPS negada.';
-                    this.style.color = 'var(--apple-red)';
+                }, () => {
+                    this.innerText = '❌ Erro no GPS.';
                 });
-            } else {
-                this.innerText = '❌ GPS não suportado.';
             }
         });
 
         document.getElementById('leadForm').addEventListener('submit', async function(event) {
             event.preventDefault();
             const btnSubmit = this.querySelector('.submit-btn');
-            const textoOriginal = btnSubmit.innerText;
-            btnSubmit.innerText = 'Enviando...';
-            btnSubmit.disabled = true;
+            btnSubmit.innerText = 'Enviando...'; btnSubmit.disabled = true;
 
             const formData = new FormData(this);
             const data = Object.fromEntries(formData.entries());
             
-            let lat = exactLat || "";
-            let lng = exactLng || "";
+            data.lat = exactLat || "";
+            data.lng = exactLng || "";
             
-            if (!lat || !lng) {
-                let ruaCrua = data.endereco.split(',')[0].trim();
-                let rua = ruaCrua.replace(/(nº|n°|numero|número)\s*\d+/gi, '').trim();
-                let query = `${rua}, ${data.bairro}, Barra do Bugres, Mato Grosso, Brasil`;
-                
+            if (!data.lat) {
                 try {
-                    let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
-                    let geoRes = await fetch(url);
-                    let geoData = await geoRes.json();
-                    if (geoData && geoData.length > 0) {
-                        lat = geoData[0].lat;
-                        lng = geoData[0].lon;
-                    }
-                } catch (e) { console.warn("Geocoding falhou."); }
+                    let q = encodeURIComponent(`${data.endereco}, ${data.bairro}, Barra do Bugres, MT, Brasil`);
+                    let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`);
+                    let json = await res.json();
+                    if(json.length > 0) { data.lat = json[0].lat; data.lng = json[0].lon; }
+                } catch (e) {}
             }
 
-            data.lat = lat;
-            data.lng = lng;
-
             try {
-                if (SCRIPT_URL) {
-                    await fetch(SCRIPT_URL, {
-                        method: 'POST',
-                        body: JSON.stringify(data),
-                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-                    });
-                }
-                registrosArr.push(data);
-                atualizarEstatisticasIniciais();
-                document.getElementById('notification-area').innerHTML = '<div class="notification success">✅ Informações enviadas!</div>';
+                await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+                document.getElementById('notification-area').innerHTML = '<div class="notification success" style="display:block">✅ Informações enviadas!</div>';
                 this.reset();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (error) { alert("Erro ao enviar."); }
-            finally { btnSubmit.innerText = textoOriginal; btnSubmit.disabled = false; }
+            finally { btnSubmit.innerText = 'Enviar Informações'; btnSubmit.disabled = false; }
         });
 
-        function abrirAdmin() {
+        async function abrirAdmin() {
             document.getElementById('main-view').style.display = 'none';
             document.getElementById('admin-view').style.display = 'block';
             window.scrollTo(0,0);
+            
+            // Força recálculo IMEDIATAMENTE após a div ficar visível
+            if (leafletMap) {
+                setTimeout(function(){ leafletMap.invalidateSize(); }, 100);
+            }
+
+            await carregarDadosPlanilha();
             renderizarPainelAdmin();
         }
 
@@ -569,11 +533,7 @@
             document.getElementById('main-view').style.display = 'block';
         }
 
-        document.getElementById('open-admin').addEventListener('click', (e) => {
-            e.preventDefault();
-            document.getElementById('password-modal').style.display = 'flex';
-        });
-
+        document.getElementById('open-admin').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('password-modal').style.display = 'flex'; });
         document.getElementById('btn-verify-password').addEventListener('click', function() {
             if (document.getElementById('admin-password').value === 'Chico2026') {
                 document.getElementById('password-modal').style.display = 'none';
@@ -582,12 +542,24 @@
                 document.getElementById('password-error').style.display = 'block';
             }
         });
-
-        document.getElementById('btn-cancel-password').addEventListener('click', () => {
-            document.getElementById('password-modal').style.display = 'none';
-        });
-
+        document.getElementById('btn-cancel-password').addEventListener('click', () => document.getElementById('password-modal').style.display = 'none');
         document.getElementById('close-admin').addEventListener('click', fecharAdmin);
+
+        function parseCoordBR(val) {
+            if (!val) return NaN;
+            let str = String(val).trim().toUpperCase().replace(',', '.');
+            if (str.includes('°')) {
+                let parts = str.match(/(\d+)[°º]\s*(\d+)'\s*([\d.]+)"\s*([NSEW])/);
+                if (parts) {
+                    let decimal = parseFloat(parts[1]) + (parseFloat(parts[2]) / 60) + (parseFloat(parts[3]) / 3600);
+                    if (parts[4] === 'S' || parts[4] === 'W') decimal = -decimal;
+                    return decimal;
+                }
+            }
+            let n = parseFloat(str);
+            if (!isNaN(n) && n > 0 && n < 100) return -n;
+            return n;
+        }
 
         function obterCoordenadasFallback(bairro, endereco) {
             let base = coordsBairros[bairro] || coordsBairros["DEFAULT"];
@@ -616,23 +588,29 @@
         function renderizarPainelAdmin() {
             if (!leafletMap) {
                 leafletMap = L.map('admin-map').setView([-15.0743, -57.1808], 14);
-                adminTileLayer = L.tileLayer(getMapTileUrl(), { attribution: '© Google Maps' }).addTo(leafletMap);
             }
-            setTimeout(() => { leafletMap.invalidateSize(); }, 300);
+            
+            if (adminTileLayer) leafletMap.removeLayer(adminTileLayer);
+            
+            // Adicionando a camada base com as diretrizes do provedor e sem subdomínios (sem falhas de CORS)
+            adminTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(leafletMap);
 
-            leafletMap.eachLayer((layer) => { if(layer instanceof L.Marker || layer instanceof L.Polyline) { leafletMap.removeLayer(layer); } });
+            // CORREÇÃO CRÍTICA PARA O MAPA CINZENTO: Força o Leaflet a recalcular o tamanho
+            setTimeout(function() { leafletMap.invalidateSize(); }, 100);
+
+            leafletMap.eachLayer((layer) => { if(layer instanceof L.Marker) { leafletMap.removeLayer(layer); } });
             const container = document.getElementById('cards-container');
             container.innerHTML = '';
-
-            if (registrosArr.length === 0) {
-                container.innerHTML = '<p style="text-align:center; width:100%;">Nenhum registro ainda.</p>';
-                return;
-            }
 
             let markerBounds = L.latLngBounds();
             registrosArr.forEach((reg) => {
                 const cor = getCorSituacao(reg.situacao_agua);
-                const coords = (reg.lat && reg.lng) ? [parseFloat(reg.lat), parseFloat(reg.lng)] : obterCoordenadasFallback(reg.bairro, reg.endereco);
+                let latVal = parseCoordBR(reg.lat);
+                let lngVal = parseCoordBR(reg.lng);
+                const coords = (!isNaN(latVal) && !isNaN(lngVal)) ? [latVal, lngVal] : obterCoordenadasFallback(reg.bairro, reg.endereco);
                 
                 L.marker(coords, {
                     icon: L.divIcon({ className: 'custom-pin', html: `<div class="marker-pin" style="background-color: ${cor};"></div>`, iconSize: [20, 20], iconAnchor: [10, 10]})
@@ -651,7 +629,7 @@
                 card.addEventListener('click', () => abrirPerfilModal(reg, coords));
                 container.appendChild(card);
             });
-            if (registrosArr.length > 0) leafletMap.fitBounds(markerBounds, {padding: [30, 30]});
+            if (registrosArr.length > 0) leafletMap.fitBounds(markerBounds, {padding: [50, 50]});
         }
 
         function abrirPerfilModal(reg, coords) {
@@ -661,45 +639,52 @@
             const queryMapa = encodeURIComponent(`${String(reg.endereco || '')}, ${String(reg.bairro || '')}, Barra do Bugres, MT`);
             
             content.innerHTML = `
-                <div class="profile-pic">${(reg.nome || '?').charAt(0)}</div>
-                <h3>${reg.nome || 'Anônimo'}</h3>
-                <p>${reg.telefone || ''}</p>
+                <h3>${reg.nome}</h3>
                 <div id="modal-map" class="iframe-map"></div>
-                <p><b>${reg.bairro || ''}</b></p>
-                <p>${reg.endereco || ''}</p>
-                <div style="margin-top:10px;"><span class="badge ${getBadgeClass(reg.situacao_agua)}">${reg.situacao_agua}</span></div>
-                <div class="uc-actions" style="margin-top:15px;">
-                    <a href="https://wa.me/55${numeroZap}" target="_blank" class="action-btn btn-zap">WhatsApp</a>
-                    <a href="https://maps.google.com/?q=${queryMapa}" target="_blank" class="action-btn btn-map">Abrir no GPS</a>
+                <p><b>Endereço:</b> ${reg.endereco}</p>
+                <div class="uc-actions" style="margin-top:15px; display:flex; gap:10px;">
+                    <a href="https://wa.me/55${numeroZap}" target="_blank" class="action-btn btn-zap" style="text-decoration:none; flex:1">WhatsApp</a>
+                    <a href="https://maps.google.com/?q=${queryMapa}" target="_blank" class="action-btn btn-map" style="text-decoration:none; flex:1">GPS</a>
                 </div>
                 <button onclick="document.getElementById('profile-modal').style.display='none'" class="btn-outline" style="width:100%; margin-top:10px;">Fechar</button>
             `;
             modal.style.display = 'flex';
 
             setTimeout(() => {
-                if (modalMapInstance) modalMapInstance.remove();
+                if (modalMapInstance) {
+                    modalMapInstance.remove();
+                    modalMapInstance = null;
+                }
                 modalMapInstance = L.map('modal-map').setView(coords, 16);
-                L.tileLayer(getMapTileUrl(), { attribution: '© Google Maps' }).addTo(modalMapInstance);
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                }).addTo(modalMapInstance);
+                
+                // Força o mapa do modal a reconhecer o tamanho
+                setTimeout(function(){ modalMapInstance.invalidateSize(); }, 100);
+                
                 L.marker(coords, {
                     icon: L.divIcon({ className: 'custom-pin', html: `<div class="marker-pin" style="background-color: ${getCorSituacao(reg.situacao_agua)};"></div>`, iconSize: [20, 20], iconAnchor: [10, 10]})
                 }).addTo(modalMapInstance);
-
+                
+                // Rota OSRM
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(async (pos) => {
-                        const adminLat = pos.coords.latitude;
-                        const adminLng = pos.coords.longitude;
                         try {
-                            let osrmRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${adminLng},${adminLat};${coords[1]},${coords[0]}?overview=full&geometries=geojson`);
+                            const origin = `${pos.coords.longitude},${pos.coords.latitude}`;
+                            const destination = `${coords[1]},${coords[0]}`;
+                            let osrmRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${origin};${destination}?overview=full&geometries=geojson`);
                             let osrmData = await osrmRes.json();
                             if(osrmData.routes && osrmData.routes.length > 0) {
                                 let routeCoords = osrmData.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
                                 let routeLine = L.polyline(routeCoords, {color: '#0071e3', weight: 4}).addTo(modalMapInstance);
                                 modalMapInstance.fitBounds(routeLine.getBounds(), {padding: [20,20]});
                             }
-                        } catch(e) {}
+                        } catch(e) { console.error("Erro na rota OSRM", e); }
                     });
                 }
-            }, 300);
+            }, 400);
         }
 
         document.getElementById('btn-download-pdf').addEventListener('click', function() {
